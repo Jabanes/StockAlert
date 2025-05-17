@@ -1,0 +1,21 @@
+# Node modules directory
+node_modules/
+
+# Logs
+*.log
+
+# Environment variables file
+.env
+
+# Optional: You may want to ignore your test coverage
+coverage/
+
+# Optional: If you use npm cache
+.npm/
+
+# Optional: If you're using the VSCode editor
+.vscode/
+
+# Optional: Ignore OS-specific files
+.DS_Store         # macOS
+Thumbs.db         # Windows
