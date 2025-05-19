@@ -22,7 +22,7 @@ if (twilioAccountSid && twilioAuthToken && twilioWhatsappSandboxNumber && recipi
 const keywordsToMonitor = [
     'Dragon Fruit', 'Mango', 'Grape', 'Mushroom', 'Pepper',
     'Cacao', 'Beanstalk', 'Bug Egg', 'Legendary Egg', 'Mythical Egg',
-    'Lightning Rod', 'Godly Sprinkler'
+    'Lightning Rod'
 ];
 console.log(`Monitoring for keywords: ${keywordsToMonitor.join(', ')}`);
 
