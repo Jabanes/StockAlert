@@ -1,6 +1,7 @@
 const dotenv = require('dotenv');
 const axios = require('axios');
 const twilio = require('twilio');
+const http = require('http'); // Import the built-in http module
 
 dotenv.config();
 
@@ -58,20 +59,16 @@ async function fetchGrowAGardenStock() {
 let notifiedItemsThisOverallStockCycle = new Set();
 let previousOverallStockSignature = "";
 
-// Helper function to FIND keyword items in a category that haven't been notified yet
 function findNewKeywordItemsInCategory(items, categoryName, currentKeywords, notifiedItemsSet) {
     const foundItems = [];
     if (!items || items.length === 0) {
         return foundItems;
     }
-
     for (const item of items) {
         const itemName = item.name;
         if (!itemName) continue;
-
         const itemKeyForNotification = `${itemName}|${categoryName}`;
         const itemNameLower = itemName.toLowerCase();
-
         for (const keyword of currentKeywords) {
             if (itemNameLower.includes(keyword.toLowerCase())) {
                 if (!notifiedItemsSet.has(itemKeyForNotification)) {
@@ -81,7 +78,7 @@ function findNewKeywordItemsInCategory(items, categoryName, currentKeywords, not
                         matchedKeyword: keyword
                     });
                 }
-                break; // Found a keyword for this item, move to the next item
+                break;
             }
         }
     }
@@ -91,20 +88,16 @@ function findNewKeywordItemsInCategory(items, categoryName, currentKeywords, not
 async function checkStockAndNotify() {
     const currentTimestamp = new Date().toLocaleString("en-IL", { timeZone: "Asia/Jerusalem" });
     console.log(`\n[${currentTimestamp}] Checking all Grow A Garden stock...`);
-
     const stockData = await fetchGrowAGardenStock();
-
     if (!stockData) {
         console.log("No stock data received or error during fetch. Will retry next cycle.");
         return;
     }
-
     const allCurrentStockItemsForSignature = [];
     if (stockData.seedsStock) allCurrentStockItemsForSignature.push(...stockData.seedsStock.map(item => item.name + '|Seed'));
     if (stockData.eggStock) allCurrentStockItemsForSignature.push(...stockData.eggStock.map(item => item.name + '|Egg'));
     if (stockData.gearStock) allCurrentStockItemsForSignature.push(...stockData.gearStock.map(item => item.name + '|Gear'));
     const currentOverallStockSignature = allCurrentStockItemsForSignature.sort().join(',');
-
     if (currentOverallStockSignature !== previousOverallStockSignature) {
         if (previousOverallStockSignature !== "") {
             console.log("Detected a change in overall stock makeup. Resetting notified items history for this new stock cycle.");
@@ -112,9 +105,7 @@ async function checkStockAndNotify() {
         notifiedItemsThisOverallStockCycle.clear();
         previousOverallStockSignature = currentOverallStockSignature;
     }
-
     const newlyFoundKeywordItems = [];
-
     if (stockData.seedsStock) {
         newlyFoundKeywordItems.push(...findNewKeywordItemsInCategory(stockData.seedsStock, 'Seed', keywordsToMonitor, notifiedItemsThisOverallStockCycle));
     }
@@ -124,15 +115,13 @@ async function checkStockAndNotify() {
     if (stockData.gearStock) {
         newlyFoundKeywordItems.push(...findNewKeywordItemsInCategory(stockData.gearStock, 'Gear', keywordsToMonitor, notifiedItemsThisOverallStockCycle));
     }
-
     if (newlyFoundKeywordItems.length > 0) {
         let messageBody = "*GrowAGarden Stock Alert!* 🌱\n\nNew keyword items in stock:\n";
         newlyFoundKeywordItems.forEach(item => {
             messageBody += `\n- *${item.name}* (Category: ${item.category}, Keyword: "${item.matchedKeyword}")`;
             console.log(`SUCCESS: Keyword item "${item.matchedKeyword}" FOUND in ${item.category} stock: ${item.name}`);
         });
-        messageBody += `\n\nCheck now: https://www.roblox.com/games/126884695634066/Grow-a-Garden#ropro-quick-play`; // Updated link
-
+        messageBody += `\n\nCheck now: https://www.roblox.com/games/126884695634066/Grow-a-Garden#ropro-quick-play`;
         if (twilioClient) {
             try {
                 await twilioClient.messages.create({
@@ -141,7 +130,6 @@ async function checkStockAndNotify() {
                     to: `whatsapp:${recipientWhatsappNumber}`
                 });
                 console.log(`Consolidated WhatsApp alert SENT for ${newlyFoundKeywordItems.length} item(s)!`);
-                // Add all notified items to the set AFTER successful sending
                 newlyFoundKeywordItems.forEach(item => {
                     notifiedItemsThisOverallStockCycle.add(`${item.name}|${item.category}`);
                 });
@@ -158,15 +146,32 @@ async function checkStockAndNotify() {
     }
 }
 
-// --- Main Execution ---
+// --- Main Execution (Stock Checker) ---
 if (!twilioClient) {
-    console.error("FATAL: Twilio client could not be initialized. Check .env variables. Exiting.");
+    console.error("FATAL: Twilio client could not be initialized. Check .env variables. Not starting stock checker.");
 } else {
     const checkIntervalMinutes = 5;
-    console.log("Grow A Garden Stock Notifier started.");
+    console.log("Grow A Garden Stock Notifier background task started.");
     console.log(`Will check all stock categories every ${checkIntervalMinutes} minutes.`);
     console.log(`Notifications will be sent to ${recipientWhatsappNumber} via WhatsApp.`);
-
     checkStockAndNotify(); // Initial check
     setInterval(checkStockAndNotify, checkIntervalMinutes * 60 * 1000);
 }
+
+// --- Minimal HTTP Server to Satisfy Render Web Service Requirement ---
+const PORT = process.env.PORT || 3000; // Render provides PORT env var. Default to 3000 for local testing.
+
+const server = http.createServer((req, res) => {
+    if (req.url === '/health' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
+    } else {
+        res.writeHead(200, { 'Content-Type': 'text/plain' }); // Default response for root or other paths
+        res.end('Stock Notifier background service is running. Visit /health for status.\n');
+    }
+});
+
+server.listen(PORT, () => {
+    console.log(`HTTP server started and listening on port ${PORT} to satisfy Render.com Web Service requirements.`);
+    console.log(`This server provides a basic /health endpoint.`);
+});
