@@ -14,7 +14,7 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 # 5. Copy the rest of your application code into the working directory
-# This includes your FetchData.js and any other .js files or assets needed
+# This includes your app.js and the other modules (config.js, scraper.js, etc.)
 COPY . .
 
 # 6. (Optional but Recommended) Set a non-root user for security
@@ -34,11 +34,11 @@ ENV YOUR_WHATSAPP_NUMBER="YOUR_WHATSAPP_NUMBER"
 # Add any other ENV variables your script might expect, even if they are optional.
 
 # 8. Specify the command to run when the container starts
-# Assuming your main script is FetchData.js
-CMD [ "node", "FetchData.js" ]
+# Assuming your main script is app.js
+CMD [ "node", "app.js" ]
 
-# If your package.json has a start script like "start": "node FetchData.js",
+# If your package.json has a start script like "start": "node app.js",
 # you could also use:
 # CMD [ "npm", "start" ]
 # However, directly calling node is often preferred for simplicity in Docker.
-# Adjust "FetchData.js" if your main file is named differently (e.g., "bot.js" as per your package.json's main/start).
+# Adjust "app.js" if your main file is named differently.
